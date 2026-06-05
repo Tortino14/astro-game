@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dino Game</title>
+
+<style>
+body {
+  margin: 0;
+  overflow: hidden;
+  font-family: Arial;
+}
+
+/* 🖼️ GAME */
+#game {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background: url("bg.png") no-repeat center center;
+  background-size: cover;
+  display: none; /* 👈 nascosto all'inizio */
+}
+
+/* 🦖 DINO */
+#dino {
+  width: 60px;
+  position: absolute;
+  bottom: 0;
+  left: 100px;
+}
+
+/* 🌵 CACTUS */
+#cactus {
+  width: 40px;
+  position: absolute;
+  bottom: 0;
+  left: 600px;
+}
+
+/* ⚪ UI */
+#score,
+#gameOver,
+#restart {
+  color: white;
+}
+
+#score {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+}
+
+#gameOver {
+  position: absolute;
+  top: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 40px;
+  display: none;
+}
+
+#restart {
+  position: absolute;
+  top: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+}
+
+/* 🎮 MENU START */
+#menu {
+  position: absolute;
+  width: 100vw;
+  height: 100vh;
+  background: black;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+#playBtn {
+  padding: 15px 30px;
+  font-size: 20px;
+  cursor: pointer;
+}
+</style>
+</head>
+
+<body>
+
+<!-- 🎮 MENU -->
+<div id="menu">
+  <h1>🦖 ASTRO GAME</h1>
+  <button id="playBtn">PLAY</button>
+</div>
+
+<!-- 🎮 GAME -->
+<div id="game">
+
+  <img id="dino" src="dino.png">
+  <img id="cactus" src="cactus.png">
+
+  <div id="score">Score: 0</div>
+  <div id="gameOver">GAME OVER</div>
+  <button id="restart">RESTART</button>
+
+</div>
+
+<script>
+
+const menu = document.getElementById("menu");
+const game = document.getElementById("game");
+const playBtn = document.getElementById("playBtn");
+
+// 👉 SOLO AGGIUNTA MENU START
+playBtn.addEventListener("click", () => {
+  menu.style.display = "none";
+  game.style.display = "block";
+});
+
+// 👇 TUTTO IL RESTO DEL TUO GIOCO RIMANE IDENTICO
+
+const dino = document.getElementById("dino");
+const cactus = document.getElementById("cactus");
+const scoreText = document.getElementById("score");
+const gameOverText = document.getElementById("gameOver");
+const restartBtn = document.getElementById("restart");
+
+// 🦖 salto semplice
+let y = 0;
+let jumping = false;
+let up = true;
+let jumpHeight = 120;
+
+// 🌵 cactus
+let cactusX = 600;
+let speed = 6;
+
+// 🟡 score
+let score = 0;
+
+// 💀 game state
+let gameOver = false;
+
+// ⌨️ salto
+document.addEventListener("keydown", (e) => {
+  if (e.code === "Space" && !jumping && !gameOver) {
+    jumping = true;
+  }
+});
+
+// 🔁 LOOP (IDENTICO AL TUO ORIGINALE)
+function loop() {
+
+  if (!gameOver) {
+
+    if (jumping) {
+
+      if (up) {
+        y += 8;
+        if (y >= jumpHeight) up = false;
+      } else {
+        y -= 8;
+        if (y <= 0) {
+          y = 0;
+          jumping = false;
+          up = true;
+        }
+      }
+    }
+
+    dino.style.bottom = y + "px";
+
+    cactusX -= speed;
+
+    if (cactusX < -50) {
+      cactusX = 600;
+
+      score++;
+      scoreText.innerText = "Score: " + score;
+
+      if (speed < 15) speed += 0.3;
+    }
+
+    cactus.style.left = cactusX + "px";
+
+    if (
+      cactusX < 140 &&
+      cactusX > 100 &&
+      y < 40
+    ) {
+      gameOver = true;
+      gameOverText.style.display = "block";
+      restartBtn.style.display = "block";
+    }
+  }
+
+  requestAnimationFrame(loop);
+}
+
+loop();
+
+// 🔄 restart (uguale al tuo)
+restartBtn.addEventListener("click", () => {
+
+  y = 0;
+  jumping = false;
+  up = true;
+
+  cactusX = 600;
+  speed = 6;
+
+  score = 0;
+  gameOver = false;
+
+  scoreText.innerText = "Score: 0";
+  gameOverText.style.display = "none";
+  restartBtn.style.display = "none";
+});
+
+</script>
+
+</body>
+</html>
