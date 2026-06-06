@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Astro Game</title>
 
 <style>
@@ -13,10 +14,11 @@ body {
   font-family: Arial;
 }
 
+/* GAME RESPONSIVE */
 #game {
   position: absolute;
-  width: 900px;
-  height: 350px;
+  width: min(900px, 95vw);
+  height: min(350px, 60vh);
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
@@ -61,38 +63,6 @@ body {
   color: yellow;
 }
 
-/* GRAPH */
-#graphContainer {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 140px;
-  height: 90px;
-  border: 1px solid white;
-  padding: 5px;
-  box-sizing: border-box;
-}
-
-#graphTitle {
-  font-size: 10px;
-  color: white;
-  text-align: center;
-  margin-bottom: 4px;
-}
-
-#graph {
-  width: 100%;
-  height: 70px;
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-}
-
-.bar {
-  width: 4px;
-  background: lime;
-}
-
 /* HITBOX */
 .hitbox {
   position: absolute;
@@ -123,16 +93,10 @@ body {
   <div id="score">0</div>
   <div id="message"></div>
   <div id="dino"></div>
-
-  <div id="graphContainer">
-    <div id="graphTitle">DIFFICULTY GRAPH</div>
-    <div id="graph"></div>
-  </div>
 </div>
 
 <div id="menu" class="screen">
   <h1>Astro Game</h1>
-  <p>SPACE / CLICK / TAP to jump</p>
   <button onclick="start()">START</button>
 </div>
 
@@ -148,11 +112,12 @@ const game = document.getElementById("game");
 const dino = document.getElementById("dino");
 const scoreEl = document.getElementById("score");
 const message = document.getElementById("message");
-const graph = document.getElementById("graph");
 
 let cactus = null;
 let raf = null;
-let debug = false;
+
+/* IMPORTANT: HOLD H */
+let showHitbox = false;
 
 let state;
 
@@ -172,35 +137,18 @@ function reset() {
     score: 0,
     jumps: 0,
     speed: 6,
-
     y: 0,
     vel: 0,
     gravity: 0.8,
     jumping: false,
-
     cactusX: 1000,
     passed: false,
-
-    wind: 0,
     slow: 1,
-
-    startTime: Date.now(),
-    survivalTime: 0,
-
-    eventsEnabled: false,
-    eventUsed: false,
-
-    mission: {
-      jumps: 0,
-      score: false
-    },
-
-    difficulty: []
+    startTime: Date.now()
   };
 
   scoreEl.innerText = "0";
   message.innerText = "";
-  graph.innerHTML = "";
 }
 
 /* START */
@@ -214,8 +162,6 @@ function start() {
   state.running = true;
 
   spawnCactus();
-
-  cancelAnimationFrame(raf);
   raf = requestAnimationFrame(loop);
 }
 
@@ -224,10 +170,7 @@ function jump() {
   if (!state.running || state.jumping) return;
 
   state.jumping = true;
-  state.vel = 14 + state.wind;
-
-  state.jumps++;
-  state.mission.jumps++;
+  state.vel = 14;
 }
 
 /* CACTUS */
@@ -253,22 +196,7 @@ function hit() {
   );
 }
 
-/* GRAPH */
-function updateGraph() {
-  state.difficulty.push(state.speed);
-  if (state.difficulty.length > 25) state.difficulty.shift();
-
-  graph.innerHTML = "";
-
-  state.difficulty.forEach(v => {
-    const bar = document.createElement("div");
-    bar.className = "bar";
-    bar.style.height = Math.min(v * 5, 70) + "px";
-    graph.appendChild(bar);
-  });
-}
-
-/* HITBOX */
+/* HITBOX (ONLY WHILE HOLDING H) */
 function drawHitbox() {
 
   document.querySelectorAll(".hitbox").forEach(e => e.remove());
@@ -292,49 +220,10 @@ function drawHitbox() {
   }
 }
 
-/* EVENTS AFTER 30s */
-function triggerEvent() {
-
-  if (state.eventUsed) return;
-  state.eventUsed = true;
-
-  const rand = Math.random();
-
-  if (rand < 0.5) {
-    state.slow = 0.5;
-    show("Slow motion activated");
-
-    setTimeout(() => {
-      state.slow = 1;
-      show("Back to normal");
-    }, 8000);
-
-  } else {
-    state.speed *= 2;
-    show("Speed x2 activated!");
-  }
-}
-
-/* MESSAGE */
-function show(msg) {
-  message.innerText = msg;
-  setTimeout(() => message.innerText = "", 2000);
-}
-
 /* LOOP */
 function loop() {
 
   if (!state.running) return;
-
-  const now = Date.now();
-  state.survivalTime = now - state.startTime;
-
-  if (state.survivalTime > 30000) {
-    state.eventsEnabled = true;
-    triggerEvent();
-  }
-
-  state.wind = Math.sin(Date.now() / 400) * 0.5;
 
   state.vel -= state.gravity;
   state.y += state.vel;
@@ -349,19 +238,13 @@ function loop() {
 
   if (cactus) {
 
-    state.cactusX -= state.speed * state.slow;
+    state.cactusX -= state.speed;
     cactus.style.left = state.cactusX + "px";
 
     if (hit()) return gameOver();
 
-    if (!state.passed && state.cactusX < 80) {
-      state.passed = true;
-
+    if (state.cactusX < 80) {
       state.score++;
-      state.speed += 0.2;
-
-      if (state.score >= 10) state.mission.score = true;
-
       scoreEl.innerText = state.score;
 
       cactus.remove();
@@ -371,9 +254,8 @@ function loop() {
     }
   }
 
-  updateGraph();
-
-  if (debug) drawHitbox();
+  // HITBOX ONLY WHILE HOLDING H
+  if (showHitbox) drawHitbox();
   else document.querySelectorAll(".hitbox").forEach(e => e.remove());
 
   raf = requestAnimationFrame(loop);
@@ -385,19 +267,10 @@ function gameOver() {
   state.running = false;
   cancelAnimationFrame(raf);
 
-  const seconds = (state.survivalTime / 1000).toFixed(1);
-
-  const missions =
-    (state.mission.score ? "Score mission ✔ " : "Score mission ✖ ") +
-    (state.mission.jumps >= 5 ? "Jump mission ✔" : "Jump mission ✖");
-
   document.getElementById("gameover").classList.remove("hidden");
 
   document.getElementById("final").innerText =
-    `Score: ${state.score}
-Jumps: ${state.jumps}
-Survived: ${seconds}s
-Missions: ${missions}`;
+    "Score: " + state.score;
 }
 
 /* INPUT */
@@ -405,26 +278,25 @@ document.addEventListener("keydown", e => {
 
   if (e.code === "Space") jump();
 
-  if (e.code === "KeyH") debug = true;
+  if (e.code === "KeyH") showHitbox = true;
 });
 
 document.addEventListener("keyup", e => {
 
-  if (e.code === "KeyH") debug = false;
+  if (e.code === "KeyH") showHitbox = false;
+});
+
+/* MOBILE */
+document.addEventListener("touchstart", () => {
+  if (!document.getElementById("menu").classList.contains("hidden")) return;
+  if (!document.getElementById("gameover").classList.contains("hidden")) return;
+  jump();
 });
 
 document.addEventListener("click", () => {
-  if (document.getElementById("menu").classList.contains("hidden") &&
-      document.getElementById("gameover").classList.contains("hidden")) {
-    jump();
-  }
-});
-
-document.addEventListener("touchstart", () => {
-  if (document.getElementById("menu").classList.contains("hidden") &&
-      document.getElementById("gameover").classList.contains("hidden")) {
-    jump();
-  }
+  if (!document.getElementById("menu").classList.contains("hidden")) return;
+  if (!document.getElementById("gameover").classList.contains("hidden")) return;
+  jump();
 });
 
 </script>
