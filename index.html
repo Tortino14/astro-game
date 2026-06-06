@@ -1,224 +1,430 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dino Game</title>
+<meta charset="UTF-8" />
+<title>Astro Game</title>
 
 <style>
 body {
   margin: 0;
+  height: 100vh;
+  background: black;
   overflow: hidden;
   font-family: Arial;
 }
 
-/* 🖼️ GAME */
 #game {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
-  background: url("bg.png") no-repeat center center;
+  position: absolute;
+  width: 900px;
+  height: 350px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: url("bg.png");
   background-size: cover;
-  display: none; /* 👈 nascosto all'inizio */
+  overflow: hidden;
+  border-radius: 12px;
 }
 
-/* 🦖 DINO */
 #dino {
-  width: 60px;
   position: absolute;
-  bottom: 0;
-  left: 100px;
+  width: 70px;
+  height: 70px;
+  left: 80px;
+  bottom: 40px;
+  background: url("dino.png") no-repeat center;
+  background-size: contain;
 }
 
-/* 🌵 CACTUS */
-#cactus {
-  width: 40px;
+.cactus {
   position: absolute;
-  bottom: 0;
-  left: 600px;
-}
-
-/* ⚪ UI */
-#score,
-#gameOver,
-#restart {
-  color: white;
+  width: 45px;
+  height: 70px;
+  bottom: 40px;
+  background: url("cactus.png") no-repeat center;
+  background-size: contain;
 }
 
 #score {
   position: absolute;
   top: 10px;
-  left: 10px;
-}
-
-#gameOver {
-  position: absolute;
-  top: 50px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 40px;
-  display: none;
-}
-
-#restart {
-  position: absolute;
-  top: 120px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: none;
-}
-
-/* 🎮 MENU START */
-#menu {
-  position: absolute;
-  width: 100vw;
-  height: 100vh;
-  background: black;
+  left: 15px;
   color: white;
+  font-weight: bold;
+}
+
+#message {
+  position: absolute;
+  top: 30px;
+  width: 100%;
+  text-align: center;
+  color: yellow;
+}
+
+/* GRAPH */
+#graphContainer {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 140px;
+  height: 90px;
+  border: 1px solid white;
+  padding: 5px;
+  box-sizing: border-box;
+}
+
+#graphTitle {
+  font-size: 10px;
+  color: white;
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+#graph {
+  width: 100%;
+  height: 70px;
   display: flex;
-  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.bar {
+  width: 4px;
+  background: lime;
+}
+
+/* HITBOX */
+.hitbox {
+  position: absolute;
+  border: 2px solid red;
+  pointer-events: none;
+}
+
+/* SCREENS */
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
   justify-content: center;
   align-items: center;
+  flex-direction: column;
+  background: black;
+  color: white;
+  z-index: 10;
 }
 
-#playBtn {
-  padding: 15px 30px;
-  font-size: 20px;
-  cursor: pointer;
-}
+.hidden { display: none; }
 </style>
 </head>
 
 <body>
 
-<!-- 🎮 MENU -->
-<div id="menu">
-  <h1>🦖 ASTRO GAME</h1>
-  <button id="playBtn">PLAY</button>
+<div id="game">
+  <div id="score">0</div>
+  <div id="message"></div>
+  <div id="dino"></div>
+
+  <div id="graphContainer">
+    <div id="graphTitle">DIFFICULTY GRAPH</div>
+    <div id="graph"></div>
+  </div>
 </div>
 
-<!-- 🎮 GAME -->
-<div id="game">
+<div id="menu" class="screen">
+  <h1>Astro Game</h1>
+  <p>SPACE / CLICK / TAP to jump</p>
+  <button onclick="start()">START</button>
+</div>
 
-  <img id="dino" src="dino.png">
-  <img id="cactus" src="cactus.png">
-
-  <div id="score">Score: 0</div>
-  <div id="gameOver">GAME OVER</div>
-  <button id="restart">RESTART</button>
-
+<div id="gameover" class="screen hidden">
+  <h1>GAME OVER</h1>
+  <p id="final"></p>
+  <button onclick="start()">RESTART</button>
 </div>
 
 <script>
 
-const menu = document.getElementById("menu");
 const game = document.getElementById("game");
-const playBtn = document.getElementById("playBtn");
-
-// 👉 SOLO AGGIUNTA MENU START
-playBtn.addEventListener("click", () => {
-  menu.style.display = "none";
-  game.style.display = "block";
-});
-
-// 👇 TUTTO IL RESTO DEL TUO GIOCO RIMANE IDENTICO
-
 const dino = document.getElementById("dino");
-const cactus = document.getElementById("cactus");
-const scoreText = document.getElementById("score");
-const gameOverText = document.getElementById("gameOver");
-const restartBtn = document.getElementById("restart");
+const scoreEl = document.getElementById("score");
+const message = document.getElementById("message");
+const graph = document.getElementById("graph");
 
-// 🦖 salto semplice
-let y = 0;
-let jumping = false;
-let up = true;
-let jumpHeight = 120;
+let cactus = null;
+let raf = null;
+let debug = false;
 
-// 🌵 cactus
-let cactusX = 600;
-let speed = 6;
+let state;
 
-// 🟡 score
-let score = 0;
+/* RESET */
+function reset() {
 
-// 💀 game state
-let gameOver = false;
+  cancelAnimationFrame(raf);
+  document.querySelectorAll(".hitbox").forEach(e => e.remove());
 
-// ⌨️ salto
-document.addEventListener("keydown", (e) => {
-  if (e.code === "Space" && !jumping && !gameOver) {
-    jumping = true;
-  }
-});
-
-// 🔁 LOOP (IDENTICO AL TUO ORIGINALE)
-function loop() {
-
-  if (!gameOver) {
-
-    if (jumping) {
-
-      if (up) {
-        y += 8;
-        if (y >= jumpHeight) up = false;
-      } else {
-        y -= 8;
-        if (y <= 0) {
-          y = 0;
-          jumping = false;
-          up = true;
-        }
-      }
-    }
-
-    dino.style.bottom = y + "px";
-
-    cactusX -= speed;
-
-    if (cactusX < -50) {
-      cactusX = 600;
-
-      score++;
-      scoreText.innerText = "Score: " + score;
-
-      if (speed < 15) speed += 0.3;
-    }
-
-    cactus.style.left = cactusX + "px";
-
-    if (
-      cactusX < 140 &&
-      cactusX > 100 &&
-      y < 40
-    ) {
-      gameOver = true;
-      gameOverText.style.display = "block";
-      restartBtn.style.display = "block";
-    }
+  if (cactus) {
+    cactus.remove();
+    cactus = null;
   }
 
-  requestAnimationFrame(loop);
+  state = {
+    running: false,
+    score: 0,
+    jumps: 0,
+    speed: 6,
+
+    y: 0,
+    vel: 0,
+    gravity: 0.8,
+    jumping: false,
+
+    cactusX: 1000,
+    passed: false,
+
+    wind: 0,
+    slow: 1,
+
+    startTime: Date.now(),
+    survivalTime: 0,
+
+    eventsEnabled: false,
+    eventUsed: false,
+
+    mission: {
+      jumps: 0,
+      score: false
+    },
+
+    difficulty: []
+  };
+
+  scoreEl.innerText = "0";
+  message.innerText = "";
+  graph.innerHTML = "";
 }
 
-loop();
+/* START */
+function start() {
 
-// 🔄 restart (uguale al tuo)
-restartBtn.addEventListener("click", () => {
+  reset();
 
-  y = 0;
-  jumping = false;
-  up = true;
+  document.getElementById("menu").classList.add("hidden");
+  document.getElementById("gameover").classList.add("hidden");
 
-  cactusX = 600;
-  speed = 6;
+  state.running = true;
 
-  score = 0;
-  gameOver = false;
+  spawnCactus();
 
-  scoreText.innerText = "Score: 0";
-  gameOverText.style.display = "none";
-  restartBtn.style.display = "none";
+  cancelAnimationFrame(raf);
+  raf = requestAnimationFrame(loop);
+}
+
+/* JUMP */
+function jump() {
+  if (!state.running || state.jumping) return;
+
+  state.jumping = true;
+  state.vel = 14 + state.wind;
+
+  state.jumps++;
+  state.mission.jumps++;
+}
+
+/* CACTUS */
+function spawnCactus() {
+  cactus = document.createElement("div");
+  cactus.className = "cactus";
+  game.appendChild(cactus);
+
+  state.cactusX = 1000;
+  state.passed = false;
+}
+
+/* HIT */
+function hit() {
+  const dx = 80, dw = 70;
+  const cx = state.cactusX, cw = 45;
+
+  return (
+    dx < cx + cw &&
+    dx + dw > cx &&
+    state.y < 70 &&
+    state.y + 70 > 0
+  );
+}
+
+/* GRAPH */
+function updateGraph() {
+  state.difficulty.push(state.speed);
+  if (state.difficulty.length > 25) state.difficulty.shift();
+
+  graph.innerHTML = "";
+
+  state.difficulty.forEach(v => {
+    const bar = document.createElement("div");
+    bar.className = "bar";
+    bar.style.height = Math.min(v * 5, 70) + "px";
+    graph.appendChild(bar);
+  });
+}
+
+/* HITBOX */
+function drawHitbox() {
+
+  document.querySelectorAll(".hitbox").forEach(e => e.remove());
+
+  const d = document.createElement("div");
+  d.className = "hitbox";
+  d.style.left = "80px";
+  d.style.bottom = (40 + state.y) + "px";
+  d.style.width = "70px";
+  d.style.height = "70px";
+  game.appendChild(d);
+
+  if (cactus) {
+    const c = document.createElement("div");
+    c.className = "hitbox";
+    c.style.left = state.cactusX + "px";
+    c.style.bottom = "40px";
+    c.style.width = "45px";
+    c.style.height = "70px";
+    game.appendChild(c);
+  }
+}
+
+/* EVENTS AFTER 30s */
+function triggerEvent() {
+
+  if (state.eventUsed) return;
+  state.eventUsed = true;
+
+  const rand = Math.random();
+
+  if (rand < 0.5) {
+    state.slow = 0.5;
+    show("Slow motion activated");
+
+    setTimeout(() => {
+      state.slow = 1;
+      show("Back to normal");
+    }, 8000);
+
+  } else {
+    state.speed *= 2;
+    show("Speed x2 activated!");
+  }
+}
+
+/* MESSAGE */
+function show(msg) {
+  message.innerText = msg;
+  setTimeout(() => message.innerText = "", 2000);
+}
+
+/* LOOP */
+function loop() {
+
+  if (!state.running) return;
+
+  const now = Date.now();
+  state.survivalTime = now - state.startTime;
+
+  if (state.survivalTime > 30000) {
+    state.eventsEnabled = true;
+    triggerEvent();
+  }
+
+  state.wind = Math.sin(Date.now() / 400) * 0.5;
+
+  state.vel -= state.gravity;
+  state.y += state.vel;
+
+  if (state.y < 0) {
+    state.y = 0;
+    state.vel = 0;
+    state.jumping = false;
+  }
+
+  dino.style.bottom = (40 + state.y) + "px";
+
+  if (cactus) {
+
+    state.cactusX -= state.speed * state.slow;
+    cactus.style.left = state.cactusX + "px";
+
+    if (hit()) return gameOver();
+
+    if (!state.passed && state.cactusX < 80) {
+      state.passed = true;
+
+      state.score++;
+      state.speed += 0.2;
+
+      if (state.score >= 10) state.mission.score = true;
+
+      scoreEl.innerText = state.score;
+
+      cactus.remove();
+      cactus = null;
+
+      setTimeout(spawnCactus, 400);
+    }
+  }
+
+  updateGraph();
+
+  if (debug) drawHitbox();
+  else document.querySelectorAll(".hitbox").forEach(e => e.remove());
+
+  raf = requestAnimationFrame(loop);
+}
+
+/* GAME OVER */
+function gameOver() {
+
+  state.running = false;
+  cancelAnimationFrame(raf);
+
+  const seconds = (state.survivalTime / 1000).toFixed(1);
+
+  const missions =
+    (state.mission.score ? "Score mission ✔ " : "Score mission ✖ ") +
+    (state.mission.jumps >= 5 ? "Jump mission ✔" : "Jump mission ✖");
+
+  document.getElementById("gameover").classList.remove("hidden");
+
+  document.getElementById("final").innerText =
+    `Score: ${state.score}
+Jumps: ${state.jumps}
+Survived: ${seconds}s
+Missions: ${missions}`;
+}
+
+/* INPUT */
+document.addEventListener("keydown", e => {
+
+  if (e.code === "Space") jump();
+
+  if (e.code === "KeyH") debug = true;
+});
+
+document.addEventListener("keyup", e => {
+
+  if (e.code === "KeyH") debug = false;
+});
+
+document.addEventListener("click", () => {
+  if (document.getElementById("menu").classList.contains("hidden") &&
+      document.getElementById("gameover").classList.contains("hidden")) {
+    jump();
+  }
+});
+
+document.addEventListener("touchstart", () => {
+  if (document.getElementById("menu").classList.contains("hidden") &&
+      document.getElementById("gameover").classList.contains("hidden")) {
+    jump();
+  }
 });
 
 </script>
